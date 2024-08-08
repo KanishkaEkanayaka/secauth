@@ -22,15 +22,15 @@ def register():
         if user:
             return jsonify({'message': 'User already exist'}), 400
         images = request.files.getlist('images')
-        if len(images) != 100:
-            return jsonify({'message': 'Exactly 100 images are required.'}), 400
+        if len(images) < 50:
+            return jsonify({'message': 'more than 50 images are required.'}), 400
 
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         user = User(username=form.username.data, email=form.email.data, password=hashed_password, gender=form.gender.data, image_folder="")
 
         user.save_to_db()
 
-        folder_name = f"secauth/{user._id}_{user.gender}"
+        folder_name = f"sec_auth/{user._id}_{user.gender}"
         image_urls = upload_images_to_cloudinary(images, folder_name)
 
         user.image_folder = image_urls
