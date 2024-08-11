@@ -2,12 +2,14 @@ from app import mongo
 from bson.objectid import ObjectId
 
 class User:
-    def __init__(self, username, email, password, gender, image_folder, _id=None):
+    def __init__(self, username, email, password, gender, unique_number, gender_numeric, image_urls, _id=None):
         self.username = username
         self.email = email
         self.password = password
         self.gender = gender
-        self.image_folder = image_folder
+        self.unique_number = unique_number
+        self.gender_numeric = gender_numeric
+        self.image_urls = image_urls
         self._id = _id
 
     @staticmethod
@@ -24,13 +26,22 @@ class User:
             return User(**user_data)
         return None
 
+    @staticmethod
+    def find_by_unique_number(unique_number):
+        user_data = mongo.db.users.find_one({'unique_number': unique_number})
+        if user_data:
+            return User(**user_data)
+        return None
+
     def save_to_db(self):
         user_data = {
             'username': self.username,
             'email': self.email,
             'password': self.password,
             'gender': self.gender,
-            'image_folder': self.image_folder
+            'unique_number': self.unique_number,
+            'gender_numeric': self.gender_numeric,
+            'image_urls': self.image_urls
         }
         if self._id:
             mongo.db.users.update_one({'_id': ObjectId(self._id)}, {'$set': user_data})
@@ -42,6 +53,8 @@ class User:
             'username': self.username,
             'email': self.email,
             'gender': self.gender,
-            'image_folder': self.image_folder,
+            'unique_number': self.unique_number,
+            'gender_numeric': self.gender_numeric,
+            'image_urls': self.image_urls,
             '_id': str(self._id)
         }

@@ -5,40 +5,40 @@ from app.forms import RegistrationForm, LoginForm
 from app import bcrypt
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 import cloudinary.uploader
+import random
 
 auth_bp = Blueprint('auth', __name__)
 main_bp = Blueprint('main', __name__)
 
-def populate_form(form, json_data):
-    for field in form._fields:
-        if field in json_data:
-            form[field].data = json_data[field]
+def generate_unique_number():
+    while True:
+        unique_number = random.randint(100, 999999999)
+        if not User.find_by_unique_number(unique_number):
+            return unique_number
 
 @auth_bp.route("/register", methods=['POST'])
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User.find_by_email(form.email.data)
-        if user:
-            return jsonify({'message': 'User already exist'}), 400
         images = request.files.getlist('images')
         if len(images) < 50:
-            return jsonify({'message': 'more than 50 images are required.'}), 400
+            return jsonify({'message': 'More than 50 images are required.'}), 400
 
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username=form.username.data, email=form.email.data, password=hashed_password, gender=form.gender.data, image_folder="")
-
+        unique_number = generate_unique_number()
+        gender_numeric = 1 if form.gender.data == 'male' else 0  # Assign 1 for male, 0 for female
+        user = User(username=form.username.data, email=form.email.data, password=hashed_password, gender=form.gender.data, unique_number=unique_number, gender_numeric=gender_numeric, image_urls=[])
         user.save_to_db()
 
-        folder_name = f"sec_auth/{user._id}_{user.gender}"
+        folder_name = f"sec_auth_images/{unique_number}_{gender_numeric}"
         image_urls = upload_images_to_cloudinary(images, folder_name)
 
-        user.image_folder = image_urls
+        user.image_urls = image_urls
         user.save_to_db()
 
         token = generate_token(user._id)
         current_app.logger.info(f"User registered: {form.email.data}")
-        response = make_response(jsonify({'message': 'User registered successfully.'}), 201)
+        response = make_response(jsonify({'message': 'User registered successfully.', 'token': token}), 201)
         response.headers['Authorization'] = f'Bearer {token}'
         return response
     else:
@@ -52,7 +52,7 @@ def login():
         if user and bcrypt.check_password_hash(user.password, form.password.data):
             token = generate_token(user._id)
             current_app.logger.info(f"User logged in: {form.email.data}")
-            response = make_response(jsonify({'message': 'Login successful.'}), 200)
+            response = make_response(jsonify({'message': 'Login successful.', 'token': token}), 200)
             response.headers['Authorization'] = f'Bearer {token}'
             return response
         else:
