@@ -30,7 +30,7 @@ def register():
         user = User(username=form.username.data, email=form.email.data, password=hashed_password, gender=form.gender.data, unique_number=unique_number, gender_numeric=gender_numeric, image_urls=[])
         user.save_to_db()
 
-        folder_name = f"sec_auth_images/{unique_number}_{gender_numeric}"
+        folder_name = f"sec_images/{unique_number}_{gender_numeric}"
         image_urls = upload_images_to_cloudinary(images, folder_name)
 
         user.image_urls = image_urls
