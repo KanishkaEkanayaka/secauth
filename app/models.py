@@ -48,6 +48,13 @@ class User:
         else:
             self._id = mongo.db.users.insert_one(user_data).inserted_id
 
+    def delete_from_db(self):
+        """Deletes the user from the database based on the user ID."""
+        if self._id:
+            mongo.db.users.delete_one({'_id': ObjectId(self._id)})
+            return True  
+        return False  
+
     def json(self):
         return {
             'username': self.username,
