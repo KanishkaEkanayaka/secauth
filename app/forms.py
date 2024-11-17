@@ -14,7 +14,7 @@ class RegistrationForm(FlaskForm):
     ])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired()])
     gender = SelectField('Gender', choices=[('male', 'Male'), ('female', 'Female')], validators=[DataRequired()])
-    images = FileField('Images', validators=[FileRequired(), FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
+    #images = FileField('Images', validators=[FileRequired(), FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
 
     def validate_password(form, field):
         password = field.data

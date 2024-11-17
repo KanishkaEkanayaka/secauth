@@ -9,6 +9,12 @@ import random
 from datetime import datetime
 import requests
 import glob
+import os
+import requests
+import time
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
+
 
 auth_bp = Blueprint('auth', __name__)
 main_bp = Blueprint('main', __name__)
@@ -23,9 +29,31 @@ def generate_unique_number():
 def register():
     form = RegistrationForm()
     if form.validate_on_submit():
-        images = request.files.getlist('images')
-        if len(images) < 20:
-            return jsonify({'message': '20 images are required.'}), 400
+        #images = request.files.getlist('images')
+        # if len(images) < 20:
+        #     return jsonify({'message': '20 images are required.'}), 400
+
+        # Image folder path
+        folder_path = '/home/kaiz/Desktop/sec_auth_face_extractor/captured_images'
+        clear_folder(folder_path)
+        images = []
+
+        # Capture 20 images
+        for i in range(20):
+            # Make a request to capture an image
+            response = requests.get("http://localhost:5003/capture_now")
+            
+            # Check if the image is saved
+            image_paths = glob.glob(os.path.join(folder_path, '*.png'))
+            
+            if len(image_paths) > 0:
+                # Add the latest image to the list
+                latest_image = max(image_paths, key=os.path.getctime)
+                images.append(latest_image)
+                #print(images)
+
+            time.sleep(1)
+
 
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         unique_number = generate_unique_number()
@@ -39,6 +67,9 @@ def register():
         user.image_urls = image_urls
         user.save_to_db()
 
+        images = []
+        clear_folder(folder_path)
+
         token = generate_token(user._id)
         current_time = datetime.now()
         
@@ -46,7 +77,7 @@ def register():
         try:
             res = requests.post('http://localhost:5001/incremental_train')
             if res.status_code != 200:
-                user.delete_from_db()  # Delete the user record if training fails
+                user.delete_from_db()  # delete the user record if training fails
                 try:
                     delete_cloudinary = delete_from_cloudinary(folder_name=folder_name)
                 except Exception as e:
@@ -55,7 +86,7 @@ def register():
                 current_app.logger.info(f"User registeration failed: {form.email.data} at {current_time.date()} {current_time.time()}")
                 return jsonify({'message': 'Registration failed. Incremental training unsuccessful.'}), 500
         except requests.RequestException as e:
-            user.delete_from_db()  # Delete the user record if there's a request error
+            user.delete_from_db()  # delete the user record if there's a request error
             try:
                 delete_cloudinary = delete_from_cloudinary(folder_name=folder_name)
             except Exception as e:
@@ -91,20 +122,6 @@ def login():
         return jsonify({'errors': form.errors}), 400
     
 
-import requests
-import time
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-
-auth_bp = Blueprint("auth_bp", __name__)
-
-import requests
-import time
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-
-auth_bp = Blueprint("auth_bp", __name__)
-
 @auth_bp.route("/continuous_auth", methods=['POST'])
 @jwt_required()
 def continuous_auth():
@@ -139,81 +156,83 @@ def continuous_auth():
 
             except ValueError as json_error:
                 print("JSON decode error:", json_error)
-                print("Response content:", response.text)  # Log what the server actually returned
+                print("Response content:", response.text)  
                 return jsonify({"error": "Invalid response format from detection service"}), 500
 
-            time.sleep(1)  # Delay between requests within this cycle
+            time.sleep(1)  
 
         if not_human_count == 3:
             logout_response = requests.delete('http://localhost:5000/logout', headers=headers)
             print("User logged out:", logout_response.text)
             return jsonify({"message": "User logged out due to continuous non-human detection."}), 200
-        # else:
-        #     identity_wrong = 0
-        #     for _ in range(2):
-        #         try:
-        #             #folder path
-        #             folder_path = '/home/kaiz/Desktop/sec_auth_face_extractor/captured_images'
-        #             clear_folder(folder_path)
-        #             response = requests.get("http://localhost:5003/capture_now")
+        else:
+            identity_wrong = 0
+            for _ in range(1):
+                try:
+                    #folder path
+                    folder_path = '/home/kaiz/Desktop/sec_auth_face_extractor/captured_images'
+                    clear_folder(folder_path)
+                    response = requests.get("http://localhost:5003/capture_now")
 
-        #             # Define the URL to send the POST request
-        #             url = 'http://localhost:5001/predict'  
+                    # Define the URL to send the POST request
+                    url = 'http://localhost:5001/predict'  
 
-        #             # Use glob to find all .jpg files in a specified directory
-        #             image_paths = glob.glob('/home/kaiz/Desktop/sec_auth_face_extractor/captured_images/*.jpg')
+                    # Use glob to find all .jpg files in a specified directory
+                    image_paths = glob.glob('/home/kaiz/Desktop/sec_auth_face_extractor/captured_images/*.png')
 
-        #             # Loop through the found images and send each one
-        #             for image_path in image_paths:
-        #                 with open(image_path, 'rb') as img:
-        #                     files = {'file': img}
-        #                     response = requests.post(url, files=files)
+                    # Loop through the found images and send each one
+                    for image_path in image_paths:
+                        with open(image_path, 'rb') as img:
+                            files = {'file': img}
+                            response = requests.post(url, files=files)
                             
-        #                     # Check the response from the server
-        #                     if response.status_code == 200:
-        #                         print(f"Image {image_path} uploaded successfully!")
-        #                     else:
-        #                         print(f"Failed to upload image {image_path}. Status code: {response.status_code}")
+                            # Check the response from the server
+                            if response.status_code == 200:
+                                print(f"Image {image_path} uploaded successfully!")
+                            else:
+                                print(f"Failed to upload image {image_path}. Status code: {response.status_code}")
 
                     
-        #             # Check if the response is successful and contains JSON data
-        #             if response.status_code == 200 and response.headers.get('Content-Type') == 'application/json':
-        #                 detected_data = response.json()
-        #                 identity = detected_data.get("identity", [])
-        #                 if identity:
-        #                     identity = identity[0]
-        #                 print(identity)
-        #                 #query the user with this identity
-        #                 user = User.find_by_unique_number(identity)
+                    # Check if the response is successful and contains JSON data
+                    if response.status_code == 200 and response.headers.get('Content-Type') == 'application/json':
+                        detected_data = response.json()
+                        identity = detected_data.get("identity", [])
+                        if identity:
+                            identity = identity[0]
+                        print(identity)
+                        #query the user with this identity
+                        user = User.find_by_unique_number(int(identity))
+                        print(user._id)
 
-        #                 #get id passed with the jwt
-        #                 current_user_id = get_jwt_identity()
+                        #get id passed with the jwt
+                        current_user_id = get_jwt_identity()
+                        print(current_user_id)
 
-        #                 # Check if "person" is not in detected labels
-        #                 if current_user_id is not user._id:
-        #                     print('invalid user')
-        #                     identity_wrong += 1
-        #                     clear_folder(folder_path)
-        #             else:
-        #                 print("Unexpected response format or status code:", response.status_code, response.text)
+                        # Check if "person" is not in detected labels
+                        if str(current_user_id) != str(user._id):
+                            print('invalid user')
+                            identity_wrong += 1
+                            clear_folder(folder_path)
+                    else:
+                        print("Unexpected response format or status code:", response.status_code, response.text)
 
-        #         except requests.exceptions.RequestException as e:
-        #             print("Request failed:", e)
-        #             return jsonify({"error": "Failed to reach detection service"}), 500
+                except requests.exceptions.RequestException as e:
+                    print("Request failed:", e)
+                    return jsonify({"error": "Failed to reach detection service"}), 500
 
-        #         except ValueError as json_error:
-        #             print("JSON decode error:", json_error)
-        #             print("Response content:", response.text)  # Log what the server actually returned
-        #             return jsonify({"error": "Invalid response format from detection service"}), 500
+                except ValueError as json_error:
+                    print("JSON decode error:", json_error)
+                    print("Response content:", response.text)  # Log what the server actually returned
+                    return jsonify({"error": "Invalid response format from detection service"}), 500
 
-        #         time.sleep(1)  # Delay between requests within this cycle
+                time.sleep(1)  
 
-        #     if identity_wrong == 2:
-        #         logout_response = requests.delete('http://localhost:5000/logout', headers=headers)
-        #         print("User logged out:", logout_response.text)
-        #         return jsonify({"message": "User logged out due to continuous wrong identity detection."}), 200
+            if identity_wrong == 1:
+                logout_response = requests.delete('http://localhost:5000/logout', headers=headers)
+                print("User logged out:", logout_response.text)
+                return jsonify({"message": "User logged out due to continuous wrong identity detection."}), 200
         
-        time.sleep(5)  # Delay before the next cycle
+        time.sleep(5)  
 
 
                    
